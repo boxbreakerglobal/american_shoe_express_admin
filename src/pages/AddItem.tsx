@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Upload, X } from "lucide-react";
+import { Plus, Upload, X, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import axiosInstance from "@/lib/axios";
 
@@ -25,27 +25,80 @@ const AddItem = () => {
   const [gender, setGender] = useState("unisex");
   const [quantity, setQuantity] = useState(0);
   const [cost, setCost] = useState(0);
-  const [image, setImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState("");
+  const [size, setSize] = useState("");
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
+  const [images, setImages] = useState<Array<{ file: File; preview: string }>>([]);
   const { toast } = useToast();
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        setImagePreview(result);
-      };
-      reader.readAsDataURL(file);
+  const typeOptions = [
+    "Men",
+    "Womens",
+    "Unisex",
+    "Children",
+    "Teen",
+    "Sneakers",
+    "Dress",
+    "Sandals",
+    "Boots",
+  ];
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const fileArray = Array.from(files);
+      
+      const imagePromises = fileArray.map((file) => {
+        return new Promise<{ file: File; preview: string }>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const result = reader.result as string;
+            resolve({ file, preview: result });
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+      
+      const newImages = await Promise.all(imagePromises);
+      setImages((prev) => [...prev, ...newImages]);
     }
   };
 
-  const removeImage = () => {
-    setImage(null);
-    setImagePreview("");
+  const removeImage = (index: number) => {
+    setImages((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+      // Revoke object URLs to prevent memory leaks
+      return updated;
+    });
   };
+
+  const toggleType = (type: string) => {
+    setSelectedTypes((prev) =>
+      prev.includes(type)
+        ? prev.filter((t) => t !== type)
+        : [...prev, type]
+    );
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        typeDropdownRef.current &&
+        !typeDropdownRef.current.contains(event.target as Node)
+      ) {
+        setTypeDropdownOpen(false);
+      }
+    };
+
+    if (typeDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [typeDropdownOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,9 +111,11 @@ const AddItem = () => {
       formData.append('Gender', gender);
       formData.append('quantity', String(quantity));
       formData.append('cost', String(cost));
-      if (image) {
-        formData.append('image', image);
-      }
+      formData.append('size', size);
+      formData.append('type', JSON.stringify(selectedTypes));
+      images.forEach((img, index) => {
+        formData.append(`images`, img.file);
+      });
 
       const response = await axiosInstance.post('/add-shoe', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -78,8 +133,9 @@ const AddItem = () => {
         setGender("unisex");
         setQuantity(0);
         setCost(0);
-        setImage(null);
-        setImagePreview("");
+        setSize("");
+        setSelectedTypes([]);
+        setImages([]);
         setOpen(false);
       } else {
         toast({
@@ -175,6 +231,56 @@ const AddItem = () => {
                   />
                 </div>
                 <div className="grid gap-2">
+                  <Label htmlFor="size">Size</Label>
+                  <Input
+                    id="size"
+                    value={size}
+                    onChange={(e) => setSize(e.target.value)}
+                    placeholder="e.g., 9, 10, M, L, etc."
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Type</Label>
+                  <div className="relative" ref={typeDropdownRef}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-between"
+                      onClick={() => setTypeDropdownOpen(!typeDropdownOpen)}
+                    >
+                      <span className="text-left">
+                        {selectedTypes.length === 0
+                          ? "Select types..."
+                          : `${selectedTypes.length} type${selectedTypes.length !== 1 ? "s" : ""} selected`}
+                      </span>
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform ${
+                          typeDropdownOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </Button>
+                    {typeDropdownOpen && (
+                      <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                        {typeOptions.map((type) => (
+                          <label
+                            key={type}
+                            className="flex items-center p-2 hover:bg-accent cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedTypes.includes(type)}
+                              onChange={() => toggleType(type)}
+                              className="mr-2 h-4 w-4"
+                            />
+                            <span className="text-sm">{type}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="grid gap-2">
                   <Label>Gender</Label>
                   <RadioGroup value={gender} onValueChange={setGender}>
                     <div className="flex items-center space-x-2">
@@ -192,47 +298,53 @@ const AddItem = () => {
                   </RadioGroup>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="image">Image</Label>
-                  {!imagePreview ? (
-                    <div className="flex flex-col gap-2">
-                      <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
-                        <Input
-                          id="image"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageChange}
-                          className="hidden"
-                          required
-                        />
-                        <Label htmlFor="image" className="cursor-pointer flex flex-col items-center gap-2">
-                          <Upload className="h-8 w-8 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">
-                            Click to upload shoe image
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            PNG, JPG, WEBP up to 10MB
-                          </span>
-                        </Label>
+                  <Label htmlFor="image">Images</Label>
+                  <div className="flex flex-col gap-4">
+                    {images.length > 0 && (
+                      <div className="grid grid-cols-2 gap-4">
+                        {images.map((img, index) => (
+                          <div
+                            key={index}
+                            className="relative rounded-lg overflow-hidden border border-border"
+                          >
+                            <img
+                              src={img.preview}
+                              alt={`Preview ${index + 1}`}
+                              className="w-full h-48 object-cover"
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="icon"
+                              className="absolute top-2 right-2"
+                              onClick={() => removeImage(index)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  ) : (
-                    <div className="relative rounded-lg overflow-hidden border border-border">
-                      <img
-                        src={imagePreview}
-                        alt="Preview"
-                        className="w-full h-48 object-cover"
+                    )}
+                    <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
+                      <Input
+                        id="image"
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleImageChange}
+                        className="hidden"
                       />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-2 right-2"
-                        onClick={removeImage}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <Label htmlFor="image" className="cursor-pointer flex flex-col items-center gap-2">
+                        <Upload className="h-8 w-8 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
+                          Click to upload shoe images
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          PNG, JPG, WEBP up to 10MB each (multiple allowed)
+                        </span>
+                      </Label>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
               <DialogFooter>

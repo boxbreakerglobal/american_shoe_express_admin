@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Package, Pencil, Trash2, Upload, X } from "lucide-react";
+import { Package, Pencil, Trash2, Upload, X, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import axiosInstance from "@/lib/axios";
 
@@ -36,7 +36,9 @@ interface ShoeItem {
   gender?: string;
   quantity?: number;
   cost?: number;
-  image: string;
+  images: string | string[];
+  size?: string;
+  type?: string[];
   createdAt: string;
 }
 
@@ -50,9 +52,44 @@ const AllItems = () => {
   const [editGender, setEditGender] = useState("unisex");
   const [editQuantity, setEditQuantity] = useState(0);
   const [editCost, setEditCost] = useState(0);
-  const [editImage, setEditImage] = useState("");
-  const [editImagePreview, setEditImagePreview] = useState("");
+  const [editSize, setEditSize] = useState("");
+  const [editSelectedTypes, setEditSelectedTypes] = useState<string[]>([]);
+  const [editTypeDropdownOpen, setEditTypeDropdownOpen] = useState(false);
+  const [editImages, setEditImages] = useState<string[]>([]);
+  const [editImageFiles, setEditImageFiles] = useState<Array<{ file: File; preview: string }>>([]);
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  const typeOptions = [
+    "Men",
+    "Womens",
+    "Unisex",
+    "Children",
+    "Teen",
+    "Sneakers",
+    "Dress",
+    "Sandals",
+    "Boots",
+  ];
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        typeDropdownRef.current &&
+        !typeDropdownRef.current.contains(event.target as Node)
+      ) {
+        setEditTypeDropdownOpen(false);
+      }
+    };
+
+    if (editTypeDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [editTypeDropdownOpen]);
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -108,53 +145,123 @@ const AllItems = () => {
     setEditGender(item.gender || "unisex");
     setEditQuantity(item.quantity || 0);
     setEditCost(item.cost || 0);
-    setEditImage(item.image);
-    setEditImagePreview(item.image);
+    setEditSize(item.size || "");
+    setEditSelectedTypes(item.type || []);
+    // Handle images - can be string or string array
+    if (Array.isArray(item.images)) {
+      setEditImages(item.images);
+    } else {
+      setEditImages([item.images]);
+    }
+    setEditImageFiles([]);
   };
 
-  const handleEditImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        setEditImage(result);
-        setEditImagePreview(result);
-      };
-      reader.readAsDataURL(file);
+  const handleEditImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const fileArray = Array.from(files);
+      
+      const imagePromises = fileArray.map((file) => {
+        return new Promise<{ file: File; preview: string }>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const result = reader.result as string;
+            resolve({ file, preview: result });
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+      
+      const newImages = await Promise.all(imagePromises);
+      setEditImageFiles((prev) => [...prev, ...newImages]);
     }
   };
 
-  const removeEditImage = () => {
-    setEditImage("");
-    setEditImagePreview("");
+  const removeEditImage = (index: number, isFile: boolean = false) => {
+    if (isFile) {
+      setEditImageFiles((prev) => prev.filter((_, i) => i !== index));
+    } else {
+      setEditImages((prev) => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const toggleEditType = (type: string) => {
+    setEditSelectedTypes((prev) =>
+      prev.includes(type)
+        ? prev.filter((t) => t !== type)
+        : [...prev, type]
+    );
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editItem) return;
 
-    const changedValues: any = {};
-    
-    if (editName !== editItem.name) changedValues.name = editName;
-    if (editDescription !== editItem.description) changedValues.description = editDescription;
-    if (editItemNumber !== editItem.itemNumber) changedValues.itemNumber = editItemNumber;
-    if (editGender !== editItem.gender) changedValues.Gender = editGender;
-    if (editQuantity !== editItem.quantity) changedValues.quantity = editQuantity;
-    if (editCost !== editItem.cost) changedValues.cost = editCost;
-    if (editImage !== editItem.image) changedValues.image = editImage;
-
     try {
-      const response = await axiosInstance.put(`/update-shoe/${editItem._id}`, changedValues);
+      const formData = new FormData();
+      const changedValues: any = {};
+      
+      if (editName !== editItem.name) {
+        changedValues.name = editName;
+        formData.append('name', editName);
+      }
+      if (editDescription !== editItem.description) {
+        changedValues.description = editDescription;
+        formData.append('description', editDescription);
+      }
+      if (editItemNumber !== editItem.itemNumber) {
+        changedValues.itemNumber = editItemNumber;
+        formData.append('itemNumber', editItemNumber);
+      }
+      if (editGender !== editItem.gender) {
+        changedValues.Gender = editGender;
+        formData.append('Gender', editGender);
+      }
+      if (editQuantity !== editItem.quantity) {
+        changedValues.quantity = editQuantity;
+        formData.append('quantity', String(editQuantity));
+      }
+      if (editCost !== editItem.cost) {
+        changedValues.cost = editCost;
+        formData.append('cost', String(editCost));
+      }
+      if (editSize !== (editItem.size || "")) {
+        changedValues.size = editSize;
+        formData.append('size', editSize);
+      }
+      
+      // Handle type array
+      const currentTypes = editItem.type || [];
+      const typesChanged = JSON.stringify(editSelectedTypes.sort()) !== JSON.stringify(currentTypes.sort());
+      if (typesChanged) {
+        changedValues.type = editSelectedTypes;
+        formData.append('type', JSON.stringify(editSelectedTypes));
+      }
+
+      // Handle images - add new files if any
+      if (editImageFiles.length > 0) {
+        editImageFiles.forEach((img, index) => {
+          formData.append(`images`, img.file);
+        });
+      }
+
+      // If no new files but images changed, send the updated array
+      const currentImages = Array.isArray(editItem.images) ? editItem.images : [editItem.images];
+      const imagesChanged = JSON.stringify(editImages) !== JSON.stringify(currentImages);
+      if (imagesChanged && editImageFiles.length === 0) {
+        formData.append('images', JSON.stringify(editImages));
+      }
+
+      const response = await axiosInstance.put(`/update-shoe/${editItem._id}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
 
       if (response.data.success) {
-        const updatedItems = items.map((item) =>
-          item._id === editItem._id
-            ? { ...item, ...changedValues, gender: changedValues.Gender || item.gender, cost: changedValues.cost !== undefined ? changedValues.cost : item.cost }
-            : item
-        );
-
-        setItems(updatedItems);
+        // Refresh items to get updated data from server
+        const refreshResponse = await axiosInstance.get('/all-shoes');
+        if (refreshResponse.data.success && refreshResponse.data.allItems) {
+          setItems(refreshResponse.data.allItems);
+        }
         
         toast({
           title: "Updated",
@@ -162,6 +269,8 @@ const AllItems = () => {
         });
         
         setEditItem(null);
+        setEditImages([]);
+        setEditImageFiles([]);
       }
     } catch (error: any) {
       toast({
@@ -200,7 +309,7 @@ const AllItems = () => {
             <CardHeader className="p-0">
               <div className="aspect-square overflow-hidden bg-muted relative group">
                 <img
-                  src={item.image}
+                  src={Array.isArray(item.images) ? (item.images[0] || "/placeholder.svg") : item.images}
                   alt={item.name}
                   className="w-full h-full object-cover"
                   onError={(e) => {
@@ -327,6 +436,55 @@ const AllItems = () => {
                 />
               </div>
               <div className="grid gap-2">
+                <Label htmlFor="edit-size">Size</Label>
+                <Input
+                  id="edit-size"
+                  value={editSize}
+                  onChange={(e) => setEditSize(e.target.value)}
+                  placeholder="e.g., 9, 10, M, L, etc."
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Type</Label>
+                <div className="relative" ref={typeDropdownRef}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-between"
+                    onClick={() => setEditTypeDropdownOpen(!editTypeDropdownOpen)}
+                  >
+                    <span className="text-left">
+                      {editSelectedTypes.length === 0
+                        ? "Select types..."
+                        : editSelectedTypes.join(", ")}
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${
+                        editTypeDropdownOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </Button>
+                  {editTypeDropdownOpen && (
+                    <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {typeOptions.map((type) => (
+                        <label
+                          key={type}
+                          className="flex items-center p-2 hover:bg-accent cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={editSelectedTypes.includes(type)}
+                            onChange={() => toggleEditType(type)}
+                            className="mr-2 h-4 w-4"
+                          />
+                          <span className="text-sm">{type}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="grid gap-2">
                 <Label>Gender</Label>
                 <RadioGroup value={editGender} onValueChange={setEditGender}>
                   <div className="flex items-center space-x-2">
@@ -344,61 +502,84 @@ const AllItems = () => {
                 </RadioGroup>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="edit-image">Image</Label>
-                {!editImagePreview ? (
-                  <div className="flex flex-col gap-2">
-                    <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
-                      <Input
-                        id="edit-image"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleEditImageChange}
-                        className="hidden"
-                      />
-                      <Label htmlFor="edit-image" className="cursor-pointer flex flex-col items-center gap-2">
-                        <Upload className="h-8 w-8 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">
-                          Click to upload a new image
-                        </span>
-                      </Label>
+                <Label htmlFor="edit-images">Images</Label>
+                <div className="flex flex-col gap-4">
+                  {/* Display existing images */}
+                  {editImages.length > 0 && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {editImages.map((img, index) => (
+                        <div
+                          key={`existing-${index}`}
+                          className="relative rounded-lg overflow-hidden border border-border"
+                        >
+                          <img
+                            src={img}
+                            alt={`Existing ${index + 1}`}
+                            className="w-full h-48 object-cover"
+                            onError={(e) => {
+                              e.currentTarget.src = "/placeholder.svg";
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-2 right-2"
+                            onClick={() => removeEditImage(index, false)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                ) : (
-                  <div className="relative rounded-lg overflow-hidden border border-border">
-                    <img
-                      src={editImagePreview}
-                      alt="Preview"
-                      className="w-full h-48 object-cover"
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-2 right-2"
-                      onClick={removeEditImage}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                  )}
+                  {/* Display new image files to be uploaded */}
+                  {editImageFiles.length > 0 && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {editImageFiles.map((img, index) => (
+                        <div
+                          key={`new-${index}`}
+                          className="relative rounded-lg overflow-hidden border border-border"
+                        >
+                          <img
+                            src={img.preview}
+                            alt={`New ${index + 1}`}
+                            className="w-full h-48 object-cover"
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-2 right-2"
+                            onClick={() => removeEditImage(index, true)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Upload new images */}
+                  <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
                     <Input
-                      id="edit-image-replace"
+                      id="edit-images"
                       type="file"
                       accept="image/*"
+                      multiple
                       onChange={handleEditImageChange}
                       className="hidden"
                     />
-                    <Label 
-                      htmlFor="edit-image-replace"
-                      className="absolute bottom-2 right-2 cursor-pointer"
-                    >
-                      <Button type="button" size="sm" variant="secondary" asChild>
-                        <span className="flex items-center gap-2">
-                          <Upload className="h-3 w-3" />
-                          Replace
-                        </span>
-                      </Button>
+                    <Label htmlFor="edit-images" className="cursor-pointer flex flex-col items-center gap-2">
+                      <Upload className="h-8 w-8 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        Click to upload additional images
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        PNG, JPG, WEBP up to 10MB each (multiple allowed)
+                      </span>
                     </Label>
                   </div>
-                )}
+                </div>
               </div>
             </div>
             <DialogFooter>
@@ -412,3 +593,5 @@ const AllItems = () => {
 };
 
 export default AllItems;
+
+
