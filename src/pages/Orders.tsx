@@ -10,14 +10,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Package, TrendingUp, Clock, DollarSign, Calendar } from "lucide-react";
-import axios from "axios";
+  Package,
+  Clock,
+  DollarSign,
+  Calendar,
+} from "lucide-react";
 import {
   Table,
   TableBody,
@@ -26,18 +23,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 interface OrderItem {
-  name?: string;
-  quantity?: number;
-  price?: number;
-  [key: string]: any;
+  itemNumber: string;
+  name: string;
+  quantity: number;
+  price: number;
 }
 
 interface Order {
-  _id?: string;
-  id?: string;
+  _id: string;
+  id: string;
   name: string;
   phone: string;
   items: OrderItem[];
@@ -45,323 +48,271 @@ interface Order {
   location?: string;
   orderMode?: string;
   date: string;
-  status?: "pending" | "completed" | "cancelled";
+  status: "Pending" | "Completed" | "Cancelled" | "Packaged" | "Shipped";
 }
 
-const Orders = () => {
-  const [selectedMonth, setSelectedMonth] = useState("all");
+// Dummy orders
+const dummyOrders: Order[] = [
+  {
+    _id: "1",
+    id: "ORD-001",
+    name: "John Doe",
+    phone: "0244000000",
+    items: [
+      { itemNumber: "1", name: "Running Shoes", quantity: 2, price: 250 },
+      { itemNumber: "2", name: "Socks", quantity: 5, price: 20 },
+      { itemNumber: "3", name: "T-Shirt", quantity: 1, price: 50 },
+    ],
+    total: 250 * 2 + 5 * 20 + 50,
+    location: "Accra",
+    orderMode: "Delivery",
+    date: new Date().toISOString(),
+    status: "Pending",
+  },
+  {
+    _id: "2",
+    id: "ORD-002",
+    name: "Jane Smith",
+    phone: "0244111111",
+    items: [
+      { itemNumber: "1", name: "Sneakers", quantity: 1, price: 300 },
+      { itemNumber: "2", name: "Laces", quantity: 2, price: 10 },
+    ],
+    total: 300 + 2 * 10,
+    location: "Kumasi",
+    orderMode: "Pickup",
+    date: new Date().toISOString(),
+    status: "Packaged",
+  },
+];
+
+const OrdersPage = () => {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [exchangeRate, setExchangeRate] = useState<number>(0);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [todayEarnings, setTodayEarnings] = useState<number>(0);
-  const [todayOrdersCount, setTodayOrdersCount] = useState<number>(0);
-  const [monthlyEarnings, setMonthlyEarnings] = useState<number>(0);
-  const [weeklyOrdersCount, setWeeklyOrdersCount] = useState<number>(0);
-  const { toast } = useToast();
 
   useEffect(() => {
-    const fetchOrders = async () => {
+    setOrders(dummyOrders);
+
+    const fetchExchangeRate = async () => {
       try {
-        setIsLoading(true);
-        const response = await axios.get("/all-orders");
-        if (response.data && response.data.allOrders) {
-          // Map the API response to match our Order interface
-          const mappedOrders: Order[] = response.data.allOrders.map((order: any) => ({
-            _id: order._id,
-            id: order._id || `ORD-${Math.random().toString(36).substr(2, 9)}`,
-            name: order.name || "",
-            phone: order.phone || "",
-            items: Array.isArray(order.items) ? order.items : [],
-            total: order.total || 0,
-            location: order.location || "",
-            orderMode: order.orderMode || "",
-            date: order.date || new Date().toISOString(),
-            status: "completed" as const, // Default status, adjust as needed
-          }));
-          setOrders(mappedOrders);
-        }
+        const response = await fetch(
+          "https://api.exchangerate.host/latest?base=GHS&symbols=USD"
+        );
+        const data = await response.json();
+        setExchangeRate(data.rates.USD);
       } catch (error) {
-        console.error("Failed to fetch orders:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load orders.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
+        console.error("Failed to fetch exchange rate:", error);
+        setExchangeRate(0);
       }
     };
+    fetchExchangeRate();
+  }, []);
 
-    const fetchDashboardData = async () => {
-      try {
-        // Fetch today's earnings and orders
-        const dailyResponse = await axios.get("/daily-earnings-and-orders");
-        if (dailyResponse.data) {
-          setTodayEarnings(dailyResponse.data.totalEarnings || 0);
-          setTodayOrdersCount(dailyResponse.data.totalOrders || 0);
-        }
-
-        // Fetch monthly earnings
-        const monthlyResponse = await axios.get("/monthly-earnings-and-orders");
-        if (monthlyResponse.data) {
-          setMonthlyEarnings(monthlyResponse.data.totalEarnings || 0);
-        }
-
-        // Fetch weekly orders
-        const weeklyResponse = await axios.get("/weekly-orders");
-        if (weeklyResponse.data) {
-          setWeeklyOrdersCount(weeklyResponse.data.totalOrders || 0);
-        }
-      } catch (error) {
-        console.error("Failed to fetch dashboard data:", error);
-      }
-    };
-
-    fetchOrders();
-    fetchDashboardData();
-  }, [toast]);
-  
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-  const todayOrders = orders.filter(order => {
-    const orderDate = new Date(order.date);
-    return orderDate >= todayStart;
-  });
-
-  const weekOrders = orders.filter(order => {
-    const orderDate = new Date(order.date);
-    return orderDate >= weekStart;
-  });
-
-  const filteredOrders = selectedMonth === "all" 
-    ? orders 
-    : orders.filter(order => {
-        const orderDate = new Date(order.date);
-        return orderDate.getMonth() === parseInt(selectedMonth);
-      });
-
-  const todayRevenue = todayOrders.reduce((sum, order) => sum + order.total, 0);
-  const weekRevenue = weekOrders.reduce((sum, order) => sum + order.total, 0);
-
-  // Calculate monthly revenue
-  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthlyOrders = orders.filter(order => {
-    const orderDate = new Date(order.date);
-    return orderDate >= currentMonthStart;
-  });
-  const monthlyRevenue = monthlyOrders.reduce((sum, order) => sum + order.total, 0);
+  const convertToUSD = (value: number) =>
+    exchangeRate ? (value * exchangeRate).toFixed(2) : "0.00";
 
   const getStatusBadge = (status: Order["status"]) => {
-    const actualStatus = status || "completed";
-    const variants = {
-      completed: "default",
-      pending: "secondary",
-      cancelled: "destructive",
+    const variants: Record<string, string> = {
+      Completed: "default",
+      Pending: "secondary",
+      Cancelled: "destructive",
+      Packaged: "outline",
+      Shipped: "success",
     };
-    return (
-      <Badge 
-        variant={variants[actualStatus] as any}
-      >
-        {actualStatus}
-      </Badge>
+    return <Badge variant={variants[status] as any}>{status}</Badge>;
+  };
+
+  const todayTotal = 1000;
+  const todayOrdersCount = 5;
+  const monthTotal = 4000;
+  const monthOrdersCount = 20;
+
+  const handlePrint = (order: Order) => {
+    const printContent = `
+      <html>
+        <head>
+          <title>Invoice - ${order.id}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { font-size: 24px; }
+            h2 { font-size: 18px; margin-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            table, th, td { border: 1px solid #000; }
+            th, td { padding: 8px; text-align: left; }
+            .total { text-align: right; font-weight: bold; margin-top: 10px; }
+          </style>
+        </head>
+        <body>
+          <h1>American Shoe Express</h1>
+          <h2>Invoice #: ${order.id}</h2>
+          <p><strong>Customer:</strong> ${order.name}</p>
+          <p><strong>Phone:</strong> ${order.phone}</p>
+          <p><strong>Location:</strong> ${order.location || "N/A"}</p>
+          <p><strong>Order Mode:</strong> ${order.orderMode || "N/A"}</p>
+          <p><strong>Status:</strong> ${order.status}</p>
+          <p><strong>Date:</strong> ${new Date(order.date).toLocaleString()}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Item #</th>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Price (GHS)</th>
+                <th>Total (GHS)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${order.items
+                .map(
+                  (i) => `
+              <tr>
+                <td>${i.itemNumber}</td>
+                <td>${i.name}</td>
+                <td>${i.quantity}</td>
+                <td>${i.price.toFixed(2)}</td>
+                <td>${(i.price * i.quantity).toFixed(2)}</td>
+              </tr>`
+                )
+                .join("")}
+            </tbody>
+          </table>
+          <div class="total">Total: ₵${order.total.toFixed(
+            2
+          )} (~$${convertToUSD(order.total)})</div>
+        </body>
+      </html>
+    `;
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    }
+  };
+
+  const updateOrderStatus = (orderId: string, status: Order["status"]) => {
+    setOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, status } : o))
     );
   };
 
   return (
     <div className="p-4 md:p-8 space-y-6 md:space-y-8">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Orders Dashboard</h1>
-        <p className="text-sm md:text-base text-muted-foreground mt-2">Track and manage customer orders</p>
+        <h1 className="text-2xl md:text-3xl font-bold">Orders Dashboard</h1>
+        <p className="text-sm text-muted-foreground mt-2">Track and manage customer orders</p>
       </div>
 
-      {/* Earnings Cards */}
-      <div className="grid gap-4 md:gap-6 md:grid-cols-2">
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex justify-between pb-2">
             <CardTitle className="text-sm font-medium">Today's Earnings</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">₵{todayEarnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {todayOrdersCount} orders today
-            </p>
+            <div className="text-2xl font-bold">
+              ₵{todayTotal} (~<span className="text-red-700">${convertToUSD(todayTotal)}</span>)
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">{todayOrdersCount} orders today</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex justify-between pb-2">
             <CardTitle className="text-sm font-medium">Monthly Earnings</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">₵{monthlyEarnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {monthlyOrders.length} orders this month
-            </p>
+            <div className="text-2xl font-bold">
+              ₵{monthTotal} (~<span className="text-red-700">${convertToUSD(monthTotal)}</span>)
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">{monthOrdersCount} orders this month</p>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Today & This Week Stats */}
-      <div className="grid gap-4 md:gap-6 md:grid-cols-2">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex justify-between pb-2">
             <CardTitle className="text-sm font-medium">Today's Orders</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{todayOrdersCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Revenue: ₵{todayEarnings.toLocaleString()}
-            </p>
-            <p className="text-xs text-primary flex items-center gap-1 mt-1">
-              <TrendingUp className="h-3 w-3" />
-              {todayOrders.filter(o => o.status === "completed").length} completed
-            </p>
+            <div className="text-2xl font-bold">{todayOrdersCount}</div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex justify-between pb-2">
             <CardTitle className="text-sm font-medium">This Week</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{weeklyOrdersCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Revenue: ₵{weekRevenue.toLocaleString()}
-            </p>
-            <p className="text-xs text-primary flex items-center gap-1 mt-1">
-              <TrendingUp className="h-3 w-3" />
-              {weekOrders.filter(o => o.status === "completed").length} completed
-            </p>
+            <div className="text-2xl font-bold">{monthOrdersCount}</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Today's Orders Details */}
-      {todayOrders.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Today's Orders</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Order ID</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead className="hidden lg:table-cell">Phone</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="hidden sm:table-cell">Time</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {todayOrders.map((order) => (
-                    <TableRow key={order.id || order._id}>
-                      <TableCell className="font-medium">{order.id || order._id}</TableCell>
-                      <TableCell>{order.name}</TableCell>
-                      <TableCell className="hidden lg:table-cell">{order.phone}</TableCell>
-                      <TableCell className="text-right">₵{order.total}</TableCell>
-                      <TableCell>{getStatusBadge(order.status || "completed")}</TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        {new Date(order.date).toLocaleTimeString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setSelectedOrder(order)}
-                        >
-                          View Details
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Orders Table with Month Filter */}
+      {/* Orders Table */}
       <Card>
         <CardHeader>
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <CardTitle>All Orders</CardTitle>
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-full md:w-[200px]">
-                <SelectValue placeholder="Filter by month" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Months</SelectItem>
-                <SelectItem value="9">October 2025</SelectItem>
-                <SelectItem value="8">September 2025</SelectItem>
-                <SelectItem value="7">August 2025</SelectItem>
-                <SelectItem value="6">July 2025</SelectItem>
-                <SelectItem value="5">June 2025</SelectItem>
-                <SelectItem value="4">May 2025</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <CardTitle>All Orders</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Order ID</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead className="hidden lg:table-cell">Phone</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead>Order #</TableHead>
+                  <TableHead>Item #</TableHead>
+                  <TableHead>Item Name</TableHead>
+                  <TableHead>Customer Name</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Total</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="hidden sm:table-cell">Date</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      Loading orders...
+                {orders.map((order) => (
+                  <TableRow key={order.id}>
+                    <TableCell>{order.id}</TableCell>
+                    <TableCell>{order.items.map((i) => i.itemNumber).join(", ")}</TableCell>
+                    <TableCell>{order.items.map((i) => i.name).join(", ")}</TableCell>
+                    <TableCell>{order.name}</TableCell>
+                    <TableCell>{order.phone}</TableCell>
+                    <TableCell>{order.location}</TableCell>
+                    <TableCell>₵{order.total.toFixed(2)}</TableCell>
+                    <TableCell>{getStatusBadge(order.status)}</TableCell>
+                    <TableCell className="flex gap-2">
+                      <Select
+                        onValueChange={(val) =>
+                          updateOrderStatus(order.id, val as Order["status"])
+                        }
+                        defaultValue={order.status}
+                      >
+                        <SelectTrigger className="w-[120px]">
+                          <SelectValue placeholder={order.status} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Pending">Pending</SelectItem>
+                          <SelectItem value="Packaged">Packaged</SelectItem>
+                          <SelectItem value="Shipped">Shipped</SelectItem>
+                          <SelectItem value="Completed">Completed</SelectItem>
+                          <SelectItem value="Cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button size="sm" onClick={() => setSelectedOrder(order)}>
+                        View Details
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handlePrint(order)}>
+                        Print
+                      </Button>
                     </TableCell>
                   </TableRow>
-                ) : filteredOrders.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      No orders found for the selected period
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredOrders.map((order) => (
-                    <TableRow key={order.id || order._id}>
-                      <TableCell className="font-medium">{order.id || order._id}</TableCell>
-                      <TableCell>{order.name}</TableCell>
-                      <TableCell className="hidden lg:table-cell">{order.phone}</TableCell>
-                      <TableCell className="text-right">₵{order.total}</TableCell>
-                      <TableCell>{getStatusBadge(order.status || "completed")}</TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        {new Date(order.date).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setSelectedOrder(order)}
-                        >
-                          View Details
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                ))}
               </TableBody>
             </Table>
           </div>
@@ -372,10 +323,8 @@ const Orders = () => {
       <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
-            <DialogTitle>Order Details - {selectedOrder?.id || selectedOrder?._id}</DialogTitle>
-            <DialogDescription>
-              Complete order information
-            </DialogDescription>
+            <DialogTitle>Order Details - {selectedOrder?.id}</DialogTitle>
+            <DialogDescription>Complete order information</DialogDescription>
           </DialogHeader>
           {selectedOrder && (
             <div className="space-y-4">
@@ -394,43 +343,40 @@ const Orders = () => {
                     <span>{selectedOrder.location}</span>
                   </div>
                 )}
-                {selectedOrder.orderMode && (
-                  <div className="flex justify-between">
-                    <span className="font-medium">Order Mode:</span>
-                    <span>{selectedOrder.orderMode}</span>
-                  </div>
-                )}
                 <div className="flex justify-between">
                   <span className="font-medium">Status:</span>
-                  {getStatusBadge(selectedOrder.status || "completed")}
+                  {getStatusBadge(selectedOrder.status)}
                 </div>
                 <div className="flex justify-between">
                   <span className="font-medium">Date:</span>
                   <span>{new Date(selectedOrder.date).toLocaleString()}</span>
                 </div>
               </div>
-              
+
               <div className="border-t pt-4">
                 <h4 className="font-semibold mb-3">Items Ordered:</h4>
-                <div className="space-y-2">
-                  {selectedOrder.items && selectedOrder.items.length > 0 ? (
-                    selectedOrder.items.map((item, index) => (
-                      <div key={index} className="flex justify-between items-center p-2 bg-muted rounded-md">
-                        <div>
-                          <p className="font-medium">{item.name || "Item"}</p>
-                          {item.quantity && (
-                            <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
-                          )}
-                        </div>
-                        {item.price && item.quantity && (
-                          <span className="font-medium">₵{(item.price * item.quantity).toFixed(2)}</span>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No items found</p>
-                  )}
-                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item #</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Qty</TableHead>
+                      <TableHead>Price (GHS)</TableHead>
+                      <TableHead>Total (GHS)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedOrder.items.map((item) => (
+                      <TableRow key={item.itemNumber}>
+                        <TableCell>{item.itemNumber}</TableCell>
+                        <TableCell>{item.name}</TableCell>
+                        <TableCell>{item.quantity}</TableCell>
+                        <TableCell>₵{item.price}</TableCell>
+                        <TableCell>₵{(item.price * item.quantity).toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
 
               <div className="border-t pt-4 flex justify-between items-center">
@@ -445,4 +391,4 @@ const Orders = () => {
   );
 };
 
-export default Orders;
+export default OrdersPage;

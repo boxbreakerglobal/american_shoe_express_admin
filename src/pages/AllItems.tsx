@@ -323,7 +323,7 @@ const AllItems = () => {
       }
       if (editGhanaianSize !== (editItem.GhanaianSize || "")) {
         changedValues.GhanaianSize = editGhanaianSize;
-        formData.append('GhanaSize', editGhanaianSize);
+        formData.append('GhanaianSize', editGhanaianSize);
       }
       
       // Handle shoeStatus array
@@ -411,76 +411,113 @@ const AllItems = () => {
         Manage your shoe inventory ({items.length} {items.length === 1 ? "item" : "items"})
       </p>
 
-      <div className="grid gap-4 md:gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {items.map((item) => (
-          <Card key={item._id} className="overflow-hidden">
-            <CardHeader className="p-0">
-              <div className="aspect-square overflow-hidden bg-muted relative group">
-                <img
-                  src={Array.isArray(item.images) ? (item.images[0] || "/placeholder.svg") : item.images}
-                  alt={item.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.src = "/placeholder.svg";
-                  }}
-                />
-                <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    onClick={() => handleEditClick(item)}
-                    className="h-8 w-8"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="destructive"
-                    onClick={() => setDeleteId(item._id)}
-                    className="h-8 w-8"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+    <div className="overflow-x-auto mt-6">
+  <table className="w-full border border-gray-200 rounded-lg overflow-hidden">
+    <thead className="bg-gray-500 text-white">
+      <tr>
+        <th className="px-4 py-2 text-left font-light">Image</th>
+        <th className="px-4 py-2 text-left font-light">Item No.</th>
+        <th className="px-7 py-2 text-left font-light">Name</th>
+        <th className="px-4 py-2 text-left font-light">Gender</th>
+        <th className="px-4 py-2 text-left font-light">Type</th>
+        <th className="px-4 py-2 text-left font-light">Size</th>
+        <th className="px-4 py-2 text-left font-light">Price</th>
+        <th className="px-1 py-2 text-left font-light">Date Added</th>
+        <th className="px-4 py-2 text-center font-light">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {items.map((item) => (
+        <tr
+          key={item._id}
+          className="border-t hover:bg-[#F5F5DC]/50 transition"
+        >
+          {/* Image column */}
+          <td className="px-4 py-3 text-left">
+            <img
+              src={
+                Array.isArray(item.images)
+                  ? item.images[0] || "/placeholder.svg"
+                  : item.images || "/placeholder.svg"
+              }
+              alt={item.name}
+              className="w-16 h-16 object-cover rounded-md border border-gray-200"
+              onError={(e) => {
+                e.currentTarget.src = "/placeholder.svg";
+              }}
+            />
+          </td>
+
+          {/* Name */}
+          <td className="px-4 py-3 text-left">
+            <span className="text-sm bg-gray-100 px-2 py-1 rounded">
+              {item.itemNumber}
+            </span>
+          </td>
+          <td className="px-4 py-3 font-medium text-[#8B4513] text-left">
+            {item.name}
+          </td>
+          
+          <td className="px-4 py-3 font-medium text-[#8B4513]">
+            {item.Gender.map((item)=>{
+              return(
+                <p className="mr-1">{item}</p>
+              )
+            })}
+          </td>
+
+          {/* Item number */}
+          <td className="px-4 py-3 font-medium text-[#8B4513]">
+            {item.type[0]}
+          </td>
+          <td className="px-4 py-3 font-medium text-[#8B4513]">
+           {`US ${item.size} GH ${item.GhanaianSize}`}
+          </td>
+          {/* Cost */}
+          <td className="px-4 py-3 text-sm flex gap-3 mt-5">
+            <div>{item.cost !== undefined && conversionRate > 0
+              ? `$${(Number(item.cost) / conversionRate).toFixed(2)}`
+              : "-"}
               </div>
-            </CardHeader>
-            <CardContent className="p-4">
-              <h3 className="font-semibold text-lg text-foreground mb-2">{item.name}</h3>
-              <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                {item.description}
-              </p>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between gap-2">
-                  <Badge variant="secondary">{item.itemNumber}</Badge>
-                </div>
-                <div className="flex flex-col gap-1">
-                  {item.cost !== undefined && item.cost !== null && conversionRate > 0 && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Cost:</span>
-                      <span className="text-sm font-semibold text-foreground">
-                        ${(Number(item.cost) / conversionRate).toFixed(2)}
-                      </span>
-                    </div>
-                  )}
-                  {item.retailCost !== undefined && item.retailCost !== null && conversionRate > 0 && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Retail Cost:</span>
-                      <span className="text-sm font-semibold text-foreground">
-                        ${(Number(item.retailCost) / conversionRate).toFixed(2)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="p-4 pt-0">
-              <p className="text-xs text-muted-foreground">
-                Added {new Date(item.createdAt).toLocaleDateString()}
-              </p>
-            </CardFooter>
-          </Card>
-        ))}
-      </div>
+              <div>{`₵${item.cost}`}</div>
+          </td>
+
+          {/* Date */}
+          <td className="px-1 py-3 text-sm text-gray-600">
+            {new Date(item.createdAt).toLocaleDateString()}
+          </td>
+         
+
+        
+
+         
+
+          {/* Action buttons */}
+          <td className="px-4 py-3 text-center">
+            <div className="flex justify-center gap-2">
+              <Button
+                size="icon"
+                variant="secondary"
+                onClick={() => handleEditClick(item)}
+                className="h-8 w-8"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="destructive"
+                onClick={() => setDeleteId(item._id)}
+                className="h-8 w-8"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>

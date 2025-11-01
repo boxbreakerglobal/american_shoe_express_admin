@@ -1,8 +1,12 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+} from "recharts";
 import { DollarSign, TrendingUp, ShoppingCart } from "lucide-react";
 import axios from "axios";
+
+const USD_CONVERSION_RATE = 0.0923; // 1 GHS → USD approximate
 
 const Revenue = () => {
   const [todayEarnings, setTodayEarnings] = useState(0);
@@ -15,38 +19,30 @@ const Revenue = () => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        
-        // Fetch today's earnings and orders
         const dailyResponse = await axios.get("/daily-earnings-and-orders");
         if (dailyResponse.data) {
           setTodayEarnings(dailyResponse.data.totalEarnings || 0);
           setTodayOrders(dailyResponse.data.totalOrders || 0);
         }
 
-        // Fetch monthly earnings
         const monthlyResponse = await axios.get("/monthly-earnings-and-orders");
         if (monthlyResponse.data) {
           setMonthlyEarnings(monthlyResponse.data.totalEarnings || 0);
         }
 
-        // Fetch month-by-month earnings for graph
         const chartResponse = await axios.get("/month-by-month-earnings");
         if (chartResponse.data && chartResponse.data.data) {
           const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-          
-          // Transform the API data to match the expected format
           const apiData = chartResponse.data.data;
-          
-          // Create a map of all 12 months with default 0 earnings
+
           const fullYearData = monthNames.map((month, index) => {
-            // Try to find matching data from API by index
             const apiItem = apiData[index];
             return {
               month: month,
               earnings: apiItem?.earnings || apiItem?.totalEarnings || apiItem || 0
             };
           });
-          
+
           setMonthlyData(fullYearData);
         }
       } catch (error) {
@@ -59,6 +55,9 @@ const Revenue = () => {
     fetchData();
   }, []);
 
+  const todayEarningsUSD = (todayEarnings * USD_CONVERSION_RATE);
+  const monthlyEarningsUSD = (monthlyEarnings * USD_CONVERSION_RATE);
+
   return (
     <div className="p-4 md:p-8 space-y-6 md:space-y-8">
       <div>
@@ -67,24 +66,6 @@ const Revenue = () => {
       </div>
 
       <div className="grid gap-4 md:gap-6 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today's Earnings</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">
-              {isLoading ? "Loading..." : `₵${todayEarnings.toLocaleString()}`}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              <span className="text-primary flex items-center gap-1">
-                <TrendingUp className="h-3 w-3" />
-                +12.5% from yesterday
-              </span>
-            </p>
-          </CardContent>
-        </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Today's Orders</CardTitle>
@@ -102,12 +83,27 @@ const Revenue = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Today's Earnings</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">
+              {isLoading ? "Loading..." : `₵${todayEarnings.toLocaleString()} (~$${todayEarningsUSD.toFixed(2)})`}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Monthly Total</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              {isLoading ? "Loading..." : `₵${monthlyEarnings.toLocaleString()}`}
+              {isLoading ? "Loading..." : `₵${monthlyEarnings.toLocaleString()} (~$${monthlyEarningsUSD.toFixed(2)})`}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               This month's earnings
