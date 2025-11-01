@@ -25,6 +25,7 @@ const AddItem = () => {
   const [gender, setGender] = useState("unisex");
   const [quantity, setQuantity] = useState(0);
   const [cost, setCost] = useState(0);
+  const [retailCost, setRetailCost] = useState(0);
   const [size, setSize] = useState("");
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
@@ -111,6 +112,7 @@ const AddItem = () => {
       formData.append('Gender', gender);
       formData.append('quantity', String(quantity));
       formData.append('cost', String(cost));
+      formData.append('retailCost', String(retailCost));
       formData.append('size', size);
       formData.append('type', JSON.stringify(selectedTypes));
       images.forEach((img, index) => {
@@ -133,6 +135,7 @@ const AddItem = () => {
         setGender("unisex");
         setQuantity(0);
         setCost(0);
+        setRetailCost(0);
         setSize("");
         setSelectedTypes([]);
         setImages([]);
@@ -227,6 +230,19 @@ const AddItem = () => {
                     value={cost}
                     onChange={(e) => setCost(parseFloat(e.target.value) || 0)}
                     placeholder="e.g., 99.99"
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="retailCost">Retail Cost ($)</Label>
+                  <Input
+                    id="retailCost"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={retailCost}
+                    onChange={(e) => setRetailCost(parseFloat(e.target.value) || 0)}
+                    placeholder="e.g., 149.99"
                     required
                   />
                 </div>

@@ -36,6 +36,7 @@ interface ShoeItem {
   gender?: string;
   quantity?: number;
   cost?: number;
+  retailCost?: number;
   images: string | string[];
   size?: string;
   type?: string[];
@@ -52,6 +53,7 @@ const AllItems = () => {
   const [editGender, setEditGender] = useState("unisex");
   const [editQuantity, setEditQuantity] = useState(0);
   const [editCost, setEditCost] = useState(0);
+  const [editRetailCost, setEditRetailCost] = useState(0);
   const [editSize, setEditSize] = useState("");
   const [editSelectedTypes, setEditSelectedTypes] = useState<string[]>([]);
   const [editTypeDropdownOpen, setEditTypeDropdownOpen] = useState(false);
@@ -145,6 +147,7 @@ const AllItems = () => {
     setEditGender(item.gender || "unisex");
     setEditQuantity(item.quantity || 0);
     setEditCost(item.cost || 0);
+    setEditRetailCost(item.retailCost || 0);
     setEditSize(item.size || "");
     setEditSelectedTypes(item.type || []);
     // Handle images - can be string or string array
@@ -224,6 +227,10 @@ const AllItems = () => {
       if (editCost !== editItem.cost) {
         changedValues.cost = editCost;
         formData.append('cost', String(editCost));
+      }
+      if (editRetailCost !== editItem.retailCost) {
+        changedValues.retailCost = editRetailCost;
+        formData.append('retailCost', String(editRetailCost));
       }
       if (editSize !== (editItem.size || "")) {
         changedValues.size = editSize;
@@ -433,6 +440,17 @@ const AllItems = () => {
                   value={editCost}
                   onChange={(e) => setEditCost(parseFloat(e.target.value) || 0)}
                   required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-retailCost">Retail Cost ($)</Label>
+                <Input
+                  id="edit-retailCost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editRetailCost}
+                  onChange={(e) => setEditRetailCost(parseFloat(e.target.value) || 0)}
                 />
               </div>
               <div className="grid gap-2">

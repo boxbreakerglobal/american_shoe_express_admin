@@ -1,36 +1,63 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { DollarSign, TrendingUp } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
-const allMonthlyData = [
-  { month: "Jan", earnings: 4500 },
-  { month: "Feb", earnings: 5200 },
-  { month: "Mar", earnings: 4800 },
-  { month: "Apr", earnings: 6100 },
-  { month: "May", earnings: 7200 },
-  { month: "Jun", earnings: 6800 },
-  { month: "Jul", earnings: 7500 },
-  { month: "Aug", earnings: 8100 },
-  { month: "Sep", earnings: 7800 },
-  { month: "Oct", earnings: 8900 },
-  { month: "Nov", earnings: 9200 },
-  { month: "Dec", earnings: 10500 },
-];
+import { DollarSign, TrendingUp, ShoppingCart } from "lucide-react";
+import axios from "axios";
 
 const Revenue = () => {
-  const [selectedMonths, setSelectedMonths] = useState("6");
-  
-  const monthlyData = allMonthlyData.slice(-parseInt(selectedMonths));
-  const todayEarnings = 1250;
-  const monthTotal = monthlyData.reduce((sum, item) => sum + item.earnings, 0);
+  const [todayEarnings, setTodayEarnings] = useState(0);
+  const [todayOrders, setTodayOrders] = useState(0);
+  const [monthlyEarnings, setMonthlyEarnings] = useState(0);
+  const [monthlyData, setMonthlyData] = useState<Array<{ month: string; earnings: number }>>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Fetch today's earnings and orders
+        const dailyResponse = await axios.get("/daily-earnings-and-orders");
+        if (dailyResponse.data) {
+          setTodayEarnings(dailyResponse.data.totalEarnings || 0);
+          setTodayOrders(dailyResponse.data.totalOrders || 0);
+        }
+
+        // Fetch monthly earnings
+        const monthlyResponse = await axios.get("/monthly-earnings-and-orders");
+        if (monthlyResponse.data) {
+          setMonthlyEarnings(monthlyResponse.data.totalEarnings || 0);
+        }
+
+        // Fetch month-by-month earnings for graph
+        const chartResponse = await axios.get("/month-by-month-earnings");
+        if (chartResponse.data && chartResponse.data.data) {
+          const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+          
+          // Transform the API data to match the expected format
+          const apiData = chartResponse.data.data;
+          
+          // Create a map of all 12 months with default 0 earnings
+          const fullYearData = monthNames.map((month, index) => {
+            // Try to find matching data from API by index
+            const apiItem = apiData[index];
+            return {
+              month: month,
+              earnings: apiItem?.earnings || apiItem?.totalEarnings || apiItem || 0
+            };
+          });
+          
+          setMonthlyData(fullYearData);
+        }
+      } catch (error) {
+        console.error("Failed to fetch revenue data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   return (
     <div className="p-4 md:p-8 space-y-6 md:space-y-8">
@@ -39,14 +66,16 @@ const Revenue = () => {
         <p className="text-sm md:text-base text-muted-foreground mt-2">Track your shoe sales performance</p>
       </div>
 
-      <div className="grid gap-4 md:gap-6 md:grid-cols-2">
+      <div className="grid gap-4 md:gap-6 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Today's Earnings</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">${todayEarnings.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-foreground">
+              {isLoading ? "Loading..." : `₵${todayEarnings.toLocaleString()}`}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
               <span className="text-primary flex items-center gap-1">
                 <TrendingUp className="h-3 w-3" />
@@ -58,13 +87,30 @@ const Revenue = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Today's Orders</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">
+              {isLoading ? "Loading..." : todayOrders.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Orders placed today
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Monthly Total</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">${monthTotal.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-foreground">
+              {isLoading ? "Loading..." : `₵${monthlyEarnings.toLocaleString()}`}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Last 6 months average
+              This month's earnings
             </p>
           </CardContent>
         </Card>
@@ -72,50 +118,45 @@ const Revenue = () => {
 
       <Card>
         <CardHeader>
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <CardTitle>Monthly Earnings</CardTitle>
-            <Select value={selectedMonths} onValueChange={setSelectedMonths}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Select period" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="3">Last 3 months</SelectItem>
-                <SelectItem value="6">Last 6 months</SelectItem>
-                <SelectItem value="9">Last 9 months</SelectItem>
-                <SelectItem value="12">Last 12 months</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <CardTitle>Monthly Earnings</CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300} className="md:h-[350px]">
-            <LineChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis 
-                dataKey="month" 
-                stroke="hsl(var(--muted-foreground))"
-                style={{ fontSize: '12px' }}
-              />
-              <YAxis 
-                stroke="hsl(var(--muted-foreground))"
-                style={{ fontSize: '12px' }}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'hsl(var(--card))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '6px'
-                }}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="earnings" 
-                stroke="hsl(var(--primary))" 
-                strokeWidth={2}
-                dot={{ fill: 'hsl(var(--primary))' }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          {isLoading ? (
+            <div className="flex items-center justify-center h-[300px] md:h-[350px]">
+              <p className="text-muted-foreground">Loading chart data...</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={300} className="md:h-[350px]">
+              <LineChart data={monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis 
+                  dataKey="month" 
+                  stroke="hsl(var(--muted-foreground))"
+                  style={{ fontSize: '12px' }}
+                />
+                <YAxis 
+                  stroke="hsl(var(--muted-foreground))"
+                  style={{ fontSize: '12px' }}
+                  tickFormatter={(value) => `₵${value.toLocaleString()}`}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '6px'
+                  }}
+                  formatter={(value: any) => [`₵${value.toLocaleString()}`, 'Earnings']}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="earnings" 
+                  stroke="hsl(var(--primary))" 
+                  strokeWidth={2}
+                  dot={{ fill: 'hsl(var(--primary))' }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </CardContent>
       </Card>
     </div>
