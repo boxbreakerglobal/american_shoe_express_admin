@@ -227,6 +227,43 @@ const OrdersPage = () => {
       printWindow.print();
     }
   };
+  const handleDeliveryPrint = (order: Order) => {
+    const printContent = `
+      <html>
+        <head>
+          <title>Invoice - ${order.id}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { font-size: 24px; }
+            h2 { font-size: 18px; margin-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            table, th, td { border: 1px solid #000; }
+            th, td { padding: 8px; text-align: left; }
+            .total { text-align: right; font-weight: bold; margin-top: 10px; }
+          </style>
+        </head>
+        <body>
+          <h1>American Shoe Express</h1>
+          <h2>Invoice #: ${order.id}</h2>
+          <p><strong>Customer:</strong> ${order.name}</p>
+          <p><strong>Phone:</strong> ${order.phone}</p>
+          <p><strong>Location:</strong> ${order.location || "N/A"}</p>
+          <p><strong>Order Mode:</strong> ${order.orderMode || "N/A"}</p>
+          <p><strong>Status:</strong> ${order.status}</p>
+          <p><strong>Date:</strong> ${new Date(order.createdAt).toLocaleString()}</p>
+          
+       
+        </body>
+      </html>
+    `;
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    }
+  };
 
   const updateOrderStatus = async (orderId: string, status: Order["status"]) => {
   try {
@@ -328,7 +365,7 @@ const OrdersPage = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Order #</TableHead>
+                  {/* <TableHead>Order #</TableHead> */}
                   <TableHead>Item #</TableHead>
                   <TableHead>Item Name</TableHead>
                   <TableHead>Customer Name</TableHead>
@@ -342,7 +379,7 @@ const OrdersPage = () => {
               <TableBody>
                 {orders.map((order) => (
                   <TableRow key={order.id}>
-                    <TableCell>{order.id}</TableCell>
+                    {/* <TableCell>{order.id}</TableCell> */}
                     <TableCell>
                       {order.items.map((i) => i.itemNumber).join(", ")}
                     </TableCell>
@@ -376,6 +413,13 @@ const OrdersPage = () => {
                         onClick={() => setSelectedOrder(order)}
                       >
                         View Details
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDeliveryPrint(order)}
+                      >
+                        Delivery
                       </Button>
                       <Button
                         size="sm"

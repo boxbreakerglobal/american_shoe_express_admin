@@ -11,6 +11,8 @@ import {
 import { NavLink, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+// import logo from ".././"
+import logo from "../../public/American Shoe Logo - transparent.png"
 
 
 interface AdminLayoutProps {
@@ -58,8 +60,8 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         className={`fixed top-0 left-0 h-screen w-64 bg-[#0f2942] text-white flex flex-col z-40 transform transition-transform duration-300
         ${isOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
       >
-        <div className="p-5 border-b border-[#1b3a5b] bg-[#0f2942]">
-          <h2 className="text-2xl font-bold">MyShop</h2>
+        <div className="p-5 border-b border-[#0f2942] text-white bg-white">
+          <img src={logo}/>
         </div>
 
         <nav className="flex-1 flex flex-col p-3 space-y-2 overflow-y-auto">
