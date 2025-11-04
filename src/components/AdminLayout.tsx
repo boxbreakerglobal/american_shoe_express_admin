@@ -12,7 +12,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 // import logo from ".././"
-import logo from "../../public/American Shoe Logo - transparent.png"
+import logo from "../../public/American Shoe Logo (3).png"
 
 
 interface AdminLayoutProps {
@@ -60,7 +60,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         className={`fixed top-0 left-0 h-screen w-64 bg-[#0f2942] text-white flex flex-col z-40 transform transition-transform duration-300
         ${isOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
       >
-        <div className="p-5 border-b border-[#0f2942] text-white bg-white">
+        <div className="p-5 border-b border-[#0f2942] text-white bg-[#0f2942]">
           <img src={logo}/>
         </div>
 
