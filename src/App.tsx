@@ -16,7 +16,7 @@ import axios from "axios";
 import HeroImagesPage from "./pages/HeroImagesPage";
 
 const queryClient = new QueryClient();
-axios.defaults.baseURL="https://americanexpress-shoes-backend.onrender.com/api/v1"
+axios.defaults.baseURL="https://americanexpress-shoes-backend-2m38.onrender.com/api/v1"
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = localStorage.getItem("isAuthenticated") === "true";
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
